@@ -1,0 +1,34 @@
+language: node_js
+node_js:
+  - "18"
+
+services:
+  - docker
+
+env:
+  global:
+    - DOCKER_IMAGE_NAME=mrprince7/docker-travis-ci-lab
+
+install:
+  - npm ci
+
+script:
+  - npm test
+  - docker build -t $DOCKER_IMAGE_NAME:$TRAVIS_BUILD_NUMBER .
+  - docker build -t $DOCKER_IMAGE_NAME:latest .
+
+before_deploy:
+  - docker run -d -p 3000:3000 --name test-container $DOCKER_IMAGE_NAME:latest
+  - sleep 10
+  - docker exec test-container wget -q -O- http://localhost:3000/health
+  - docker stop test-container
+  - docker rm test-container
+
+after_success:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker push $DOCKER_IMAGE_NAME:$TRAVIS_BUILD_NUMBER
+  - docker push $DOCKER_IMAGE_NAME:latest
+
+branches:
+  only:
+    - main
